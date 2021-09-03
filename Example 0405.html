@@ -1,0 +1,111 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Voronoi</title>
+
+	<script src="webgl-fmi.js"></script>	
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		attribute vec2 aXY;
+        varying vec2 vXY;
+
+		void main() {
+            vXY = aXY;
+			gl_Position = vec4(aXY,0,1);
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		precision mediump float;
+        varying vec2 vXY;
+
+        uniform vec2 pXY[100];
+        uniform vec3 colors[100];
+		void main()
+		{
+            float minLength = 9999.;
+            vec3 minColor;
+            for(int i = 0; i < 100; i++) {
+                float d = abs(pXY[i].x - vXY.x) + abs(pXY[i].y - vXY.y);
+                if(d < minLength) {
+                    minLength = d;
+                    minColor = colors[i];
+                }
+            }
+			gl_FragColor = vec4(minColor, 1.);
+		}
+	</script>
+
+	<script>
+            var points = [], colors = [];
+            var dX = [], dY = [];
+            let N = 100;
+            for (let i = 0; i < N; i++) {
+                points.push(random(-1, 1), random(-1, 1));
+                colors.push(random(0, 1), random(0, 1), random(0, 1));
+                dX.push(random(-0.001, 0.001));
+                dY.push(random(-0.001, 0.001));
+            }
+
+		function start( )
+		{
+            for(let i = 0; i < N; i++) {
+                points[i*2] += dX[i];
+                points[i*2+1] += dY[i];
+                let x = points[i*2],y = points[i*2 + 1];
+                if(y <= -1 || y >= 1) {
+                    dY[i] = -dY[i];
+                }
+                if(x <= -1 || x >= 1) {
+                    dX[i] = -dX[i];
+                }
+            }
+			gl = getContext("picasso");
+			glprog = getProgram("vshader","fshader");
+
+			aXY = gl.getAttribLocation(glprog,"aXY");
+			
+			gl.clearColor(1,1,1,1);
+			gl.clear(gl.COLOR_BUFFER_BIT);
+
+			// генерираме 3N случайни точки и цветове
+			// за всеки триъгълник ползваме един и същи
+			// цвят за трите върха
+			var vData = [];
+            vData = [-1, -1, -1, 1, 1, -1,
+                      1, 1, -1, 1, 1, -1];
+
+            
+            
+			var vBuf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,vBuf);
+
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vData), gl.STATIC_DRAW);
+
+            var pointsLoc = gl.getUniformLocation(glprog, "pXY");
+            var colorsLoc = gl.getUniformLocation(glprog, "colors");
+
+            gl.uniform2fv(pointsLoc, points);
+            gl.uniform3fv(colorsLoc, colors);
+
+			gl.enableVertexAttribArray(aXY);
+			gl.vertexAttribPointer(aXY,2,gl.FLOAT,false,2*FLOATS,0*FLOATS);
+			
+			// рисуваме N триъгълника
+			gl.drawArrays(gl.TRIANGLES,0,6);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Voronoi</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="400" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>
