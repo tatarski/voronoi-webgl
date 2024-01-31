@@ -1,112 +1,171 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 
 <head>
-	<meta charset="utf-8"/>
-	<title>Voronoi</title>
+    <meta charset="utf-8" />
+    <title>Voronoi</title>
 
-	<script src="webgl-fmi.js"></script>	
-	
-	<script id="vshader" type="x-shader/x-vertex">
+    <script src="utils.js"></script>
+
+    <!-- 	Vertex shader -->
+    <script id="vshader" type="x-shader/x-vertex">
 		attribute vec2 aXY;
         varying vec2 vXY;
 
 		void main() {
-            vXY = aXY;
+           	vXY = aXY;
 			gl_Position = vec4(aXY,0,1);
 		}
 	</script>
-	
-	<script id="fshader" type="x-shader/x-fragment">
+
+    <!-- 	Fragment shader -->
+    <script id="fshader" type="x-shader/x-fragment">
 		precision mediump float;
         varying vec2 vXY;
 
         uniform vec2 pXY[100];
         uniform vec3 colors[100];
+        uniform float T;
+
+        float pnorm(vec2 aXY, float p) {
+            return pow(
+                dot(pow(abs(aXY), vec2(p, p)), vec2(1., 1.)),
+                1./p);
+        }
+        float getDist(vec2 aXY, vec2 bXY) {
+                if(abs(T-2.) < 0.1) {
+                    // Euclidean distance
+                    return pnorm(aXY - bXY, 2.);
+                } else if (abs(T - 1.) < 0.1){
+                    // Manhattan distance
+                    return pnorm(aXY - bXY, 1.);
+                } else if( abs(T - 4.) < 0.1) {
+                    return pnorm(aXY - bXY, 4.);
+                }
+        }
+        const int N = 10;
 		void main()
 		{
             float minLength = 9999.;
             vec3 minColor;
-            for(int i = 0; i < 100; i++) {
-                float d = abs(pXY[i].x - vXY.x) + abs(pXY[i].y - vXY.y);
-                if(d < minLength) {
-                    minLength = d;
-                    minColor = colors[i];
+            float minDelta = 0.01;
+
+			// Find closest point and its color
+            for(int i = 0; i < N; i++) {
+                float d = getDist(vXY, pXY[i]);
+            	if(d < minLength) {
+                	minLength = d;
+            	}
+        	}
+
+            // Blend colors of closest points
+            gl_FragColor = vec4(0., 0., 0., 1.);
+            float num_close_points = 0.;
+            for(int i = 0; i < N; i++) {
+                float d = getDist(vXY, pXY[i]);
+                if(d - minLength < minDelta) {
+                    num_close_points += 1.;
+                    gl_FragColor += vec4(colors[i], 1.);
                 }
             }
-			gl_FragColor = vec4(minColor, 1.);
+
+            gl_FragColor *= 1./num_close_points;
+            // Two different points are almost equal distance away from current pixel
+			//gl_FragColor = vec4(minColor, 1.);
 		}
 	</script>
 
-	<script>
-        //asd
-            var points = [], colors = [];
-            var dX = [], dY = [];
-            let N = 100;
-            for (let i = 0; i < N; i++) {
-                points.push(random(-1, 1), random(-1, 1));
-                colors.push(random(0, 1), random(0, 1), random(0, 1));
-                dX.push(random(-0.001, 0.001));
-                dY.push(random(-0.001, 0.001));
+    <script>
+        points = [];
+        var colors = [];
+        var dX = [], dY = [];
+        let N = 10;
+
+        var pointsLoc, points;
+        var tLoc, t = 2;
+        // Generate N points with random colors
+        for (let i = 0; i < N; i++) {
+            points.push(random(-1, 1), random(-1, 1));
+            colors.push(random(0, 1), random(0, 1), random(0, 1));
+            // Each point has random initial speed and direction
+            dX.push(random(-0.001, 0.001));
+            dY.push(random(-0.001, 0.001));
+
+
+        }
+        setInterval(() => {
+            if (t == 1) {
+                t = 2;
+            } else if (t == 2) {
+                t = 4;
+            } else if (t == 4) {
+                t = 1;
             }
 
-		function start( )
-		{
-            for(let i = 0; i < N; i++) {
-                points[i*2] += dX[i];
-                points[i*2+1] += dY[i];
-                let x = points[i*2],y = points[i*2 + 1];
-                if(y <= -1 || y >= 1) {
+            console.log(t);
+        }, 1000);
+        function update() {
+            for (let i = 0; i < N; i++) {
+                // Move points
+                points[i * 2] += dX[i];
+                points[i * 2 + 1] += dY[i];
+
+                let x = points[i * 2], y = points[i * 2 + 1];
+
+                // Change speed if out of bounds
+                if (y <= -1 || y >= 1) {
                     dY[i] = -dY[i];
                 }
-                if(x <= -1 || x >= 1) {
+                if (x <= -1 || x >= 1) {
                     dX[i] = -dX[i];
                 }
             }
-			gl = getContext("picasso");
-			glprog = getProgram("vshader","fshader");
+            // Load updated positions of points
+            gl.uniform2fv(pointsLoc, points);
+            // Load current time
+            gl.uniform1f(tLoc, Math.floor(t));
+            // Draw two triangles
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+        }
+        function start() {
+            gl = getContext("canvas1");
+            glprog = getProgram("vshader", "fshader");
 
-			aXY = gl.getAttribLocation(glprog,"aXY");
-			
-			gl.clearColor(1,1,1,1);
-			gl.clear(gl.COLOR_BUFFER_BIT);
+            aXY = gl.getAttribLocation(glprog, "aXY");
 
-			// генерираме 3N случайни точки и цветове
-			// за всеки триъгълник ползваме един и същи
-			// цвят за трите върха
-			var vData = [];
+            gl.clearColor(1, 1, 1, 1);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+
+            // Two triangles
+            var vData = [];
             vData = [-1, -1, -1, 1, 1, -1,
-                      1, 1, -1, 1, 1, -1];
+                1, 1, -1, 1, 1, -1];
 
-            
-            
-			var vBuf = gl.createBuffer();
-			gl.bindBuffer(gl.ARRAY_BUFFER,vBuf);
+            var vBuf = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, vBuf);
 
-			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vData), gl.STATIC_DRAW);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vData), gl.STATIC_DRAW);
 
-            var pointsLoc = gl.getUniformLocation(glprog, "pXY");
+            pointsLoc = gl.getUniformLocation(glprog, "pXY");
+            tLoc = gl.getUniformLocation(glprog, "T");
             var colorsLoc = gl.getUniformLocation(glprog, "colors");
 
-            gl.uniform2fv(pointsLoc, points);
             gl.uniform3fv(colorsLoc, colors);
+            gl.enableVertexAttribArray(aXY);
+            gl.vertexAttribPointer(aXY, 2, gl.FLOAT, false, 2 * 4, 0 * 4);
 
-			gl.enableVertexAttribArray(aXY);
-			gl.vertexAttribPointer(aXY,2,gl.FLOAT,false,2*FLOATS,0*FLOATS);
-			
-			// рисуваме N триъгълника
-			gl.drawArrays(gl.TRIANGLES,0,6);
-		}
-	</script>	
+            setInterval(update, 20);
+        }
+    </script>
 </head>
 
 <body onload="start()">
-	<h2>Voronoi</h2>
+    <h2>Voronoi</h2>
 
-	<noscript>
-		Искаме JavaScript, но няма!
-	</noscript>
-	
-	<canvas id="picasso" width="400" height="400" style="border: solid;">
-		Искаме canvas, но няма!
-	</canvas>
+    <noscript>
+        No js.
+    </noscript>
+
+    <canvas id="canvas1" width="400" height="400" style="border: solid;">
+        No canvas!
+    </canvas>
 </body>
