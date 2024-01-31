@@ -1,17 +1,13 @@
 ﻿
-var gl;		// глобален WebGL контекст
-var glprog;	// глобална GLSL програма
+var gl;		
+var glprog;
 
-// брой байтове в един WebGL FLOAT (трябва да са 4 байта)
-var FLOATS = Float32Array.BYTES_PER_ELEMENT;
-
-// връща WebGL контекст, свързан с HTML елемент с даден id
 function getContext(id)
 {
 	var canvas = document.getElementById(id);
 	if (!canvas)
 	{
-		alert("Искаме canvas с id=\""+id+"\", а няма!");
+		alert("No canvas!");
 		return null;
 	}
 	
@@ -23,15 +19,13 @@ function getContext(id)
 	
 	if (!context)
 	{
-		alert("Искаме WebGL контекст, а няма!");
+		alert("No WebGL!");
 	}
 	
 	return context;
 }
 
-// връща компилиран шейдър
-function getShader(id,type)
-{
+function getShader(id,type){
 	var source = document.getElementById(id).text;
 	var shader = gl.createShader(type);
 
@@ -46,8 +40,6 @@ function getShader(id,type)
 	return shader;
 }
 
-
-// връща готова програма
 function getProgram(idv,idf)
 {
 	var vShader = getShader(idv,gl.VERTEX_SHADER);
@@ -70,8 +62,6 @@ function getProgram(idv,idf)
 	return shaderProgram;
 }
 
-
-// случайно дробно число в интервал
 function random(a,b)
 {
 	return a+(b-a)*Math.random();
